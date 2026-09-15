@@ -1,129 +1,54 @@
-use std::collections::HashMap;
-
 use linalg::Matrix;
 
 use crate::net::{Activation, Network};
 mod net;
+mod probs;
 
 fn main() {
-    //let matrix = Matrix::new(2, 2);
+    let layers = vec![3, 5, 1];
 
-    //let layers = vec![3, 5, 2];
-
-    //let net = Network::new(layers, 2, Activation::Sigmoid);
+    let mut net = Network::new(layers, 2, Activation::Sigmoid);
 
     //let x = Matrix::from(&[&[1.0, 0.0]]);
+    //let true_y = Matrix::from(&[&[0.0, 0.0]]);
 
-    //let out = net.forward(x.t());
-    //println!("{:?}", out.data);
-    //
-    test2()
+    train(&mut net, 1000);
 }
 
-fn test1() {
-    let numbers = vec![1, 2, 3, 4, 5, 6];
+fn train(net: &mut Network, epochs: usize) {
+    let lr = 0.1;
+    let x_train = vec![
+        Matrix::from(&[&[1.0, 0.0]]),
+        Matrix::from(&[&[0.0, 1.0]]),
+        Matrix::from(&[&[1.0, 1.0]]),
+        Matrix::from(&[&[0.0, 0.0]]),
+    ];
+    let y_train = vec![
+        Matrix::from(&[&[0.0]]),
+        Matrix::from(&[&[0.0]]),
+        Matrix::from(&[&[1.0]]),
+        Matrix::from(&[&[1.0]]),
+    ];
 
-    let probs = calc_probbs(&numbers);
+    for epoch in 0..epochs {
+        for sample in 0..x_train.len() {
+            let x = &x_train[sample];
+            let y = &y_train[sample];
 
-    println!("{:?}", probs);
-    let multiplied_twice = mul_twice(&numbers);
+            let out = net.forward(x.t());
 
-    println!("{:?}", multiplied_twice)
-}
-fn test2() {
-    let numbers = vec![2, 2, 1, 1, 2, 1];
-    let probs = calc_probbs(&numbers);
+            let loss = net.loss(&y);
+            println!("Epoch {} | Loss: {}", epoch, loss);
 
-    println!("{:?}", probs);
-    let (multiplied_twice, m_len) = mul_twice(&numbers);
-    println!("m: {:?}", multiplied_twice);
-    let l = &hash_to_list(&multiplied_twice);
-    println!("l: {:?}", l);
-    let (added, _) = add_twice(l);
-    println!("{:?}", added)
-}
-
-fn hash_to_list(map: &HashMap<u32, f32>) -> Vec<u32> {
-    let len = map.len();
-    let mut res = Vec::new();
-
-    let mut freqs: HashMap<u32, f32> = HashMap::new();
-    for (&n, &p) in map.iter() {
-        let freq = p * len as f32;
-        freqs.insert(n, freq);
-    }
-    let min_value = freqs.values().max_by(|a, b| b.total_cmp(a)).unwrap();
-
-    for (&n, freq_f) in freqs.iter() {
-        let freq = freq_f / min_value;
-        println!("f: {}", freq);
-        for _ in 0..(freq as u32) {
-            res.push(n);
+            let (weight_grads, bias_grads) = net.backward(&x.t(), &y.t());
+            for l in 0..net.layers.len() {
+                net.weights[l] = net.weights[l].subtract(&weight_grads[l].scale(lr));
+                net.biases[l] = net.biases[l].subtract(&bias_grads[l].scale(lr));
+            }
         }
     }
-    res
-}
 
-fn add_twice(n: &[u32]) -> (HashMap<u32, f32>, usize) {
-    let probs = calc_probbs(n);
-    let mut new_probs: HashMap<u32, f32> = HashMap::new();
-
-    let mut l = 0;
-    for i in n.iter() {
-        for j in n.iter() {
-            let new_p = *probs.get(i).unwrap() + *probs.get(j).unwrap();
-            let res = i * j;
-            l += 1;
-            if let Some(v) = new_probs.get(&res) {
-                new_probs.insert(res, v + new_p);
-            } else {
-                new_probs.insert(res, new_p);
-            };
-        }
-    }
-    (new_probs, l)
-}
-fn mul_twice(n: &[u32]) -> (HashMap<u32, f32>, usize) {
-    let probs = calc_probbs(n);
-    let mut new_probs: HashMap<u32, f32> = HashMap::new();
-
-    let mut l = 0;
-    for i in n.iter() {
-        for j in n.iter() {
-            let new_p = *probs.get(i).unwrap() * *probs.get(j).unwrap();
-            let res = i * j;
-            l += 1;
-            if let Some(v) = new_probs.get(&res) {
-                new_probs.insert(res, v + new_p);
-            } else {
-                new_probs.insert(res, new_p);
-            };
-        }
-    }
-    (new_probs, l)
-}
-
-fn calc_probbs(n: &[u32]) -> HashMap<u32, f32> {
-    let sample = n.len();
-    let dups = get_dups(&n);
-    let mut probs: HashMap<u32, f32> = HashMap::new();
-
-    for x in n.iter() {
-        let prob = *dups.get(x).unwrap() as f32 / sample as f32;
-        probs.insert(*x, prob);
-    }
-    probs
-}
-
-fn get_dups(dis: &[u32]) -> HashMap<u32, u32> {
-    let mut map: HashMap<u32, u32> = HashMap::new();
-
-    for &x in dis.iter() {
-        if let Some(v) = map.get(&x) {
-            map.insert(x, v + 1);
-        } else {
-            map.insert(x, 1);
-        };
-    }
-    map
+    let x = Matrix::from(&[&[0.0, 1.0]]);
+    let out = net.forward(x.t());
+    println!("Infernce: {:.4}", out.data[0]);
 }

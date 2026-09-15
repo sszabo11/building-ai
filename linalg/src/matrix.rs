@@ -1,5 +1,6 @@
 use rand::RngExt;
 
+#[derive(Debug, Clone)]
 pub struct Matrix {
     pub rows: usize,
     pub cols: usize,
@@ -7,11 +8,18 @@ pub struct Matrix {
 }
 
 impl Matrix {
-    pub fn new(rows: usize, cols: usize) -> Self {
+    pub fn zeros(rows: usize, cols: usize) -> Self {
         Self {
             rows,
             cols,
             data: vec![0.0; rows * cols],
+        }
+    }
+    pub fn ones(rows: usize, cols: usize) -> Self {
+        Self {
+            rows,
+            cols,
+            data: vec![1.0; rows * cols],
         }
     }
 
@@ -40,10 +48,46 @@ impl Matrix {
         let s = &self.data[start..end];
         s
     }
+    pub fn pow(&self, pow: f32) -> Matrix {
+        let mut result = Matrix::zeros(self.rows, self.cols);
+
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                let index = i * self.cols + j;
+                result.data[index] = self.data[index].powf(pow)
+            }
+        }
+        result
+    }
+
+    pub fn scale(&self, scale: f32) -> Matrix {
+        let mut result = Matrix::zeros(self.rows, self.cols);
+
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                let index = i * self.cols + j;
+                result.data[index] = self.data[index] * scale;
+            }
+        }
+        result
+    }
+    pub fn mul(&self, other: &Matrix) -> Matrix {
+        assert!(self.rows == other.rows && self.cols == other.cols);
+        let mut result = Matrix::zeros(self.rows, self.cols);
+
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                let index = i * self.cols + j;
+                result.data[index] = self.data[index] * other.data[index];
+            }
+        }
+        result
+    }
+
     pub fn add(&self, other: &Matrix) -> Matrix {
         assert!(self.rows == other.rows && self.cols == other.cols);
 
-        let mut result = Matrix::new(self.rows, self.cols);
+        let mut result = Matrix::zeros(self.rows, self.cols);
 
         for i in 0..self.rows {
             for j in 0..self.cols {
@@ -56,7 +100,7 @@ impl Matrix {
     pub fn subtract(&self, other: &Matrix) -> Matrix {
         assert!(self.rows == other.rows && self.cols == other.cols);
 
-        let mut result = Matrix::new(self.rows, self.cols);
+        let mut result = Matrix::zeros(self.rows, self.cols);
 
         for i in 0..self.rows {
             for j in 0..self.cols {
@@ -75,7 +119,7 @@ impl Matrix {
     }
 
     pub fn t(&self) -> Matrix {
-        let mut result = Matrix::new(self.cols, self.rows);
+        let mut result = Matrix::zeros(self.cols, self.rows);
 
         for i in 0..self.rows {
             for j in 0..self.cols {
@@ -95,7 +139,7 @@ impl Matrix {
             other.rows,
             other.cols
         );
-        let mut result = Matrix::new(self.rows, other.cols);
+        let mut result = Matrix::zeros(self.rows, other.cols);
         // Each col in matrix B
         for j in 0..other.cols {
             // Each row in matrix A
@@ -119,9 +163,9 @@ mod tests {
     use super::*;
     #[test]
     fn test_dot1() {
-        let mut a = Matrix::new(2, 2);
+        let mut a = Matrix::zeros(2, 2);
         a.data = vec![3., 4., 7., 2.];
-        let mut b = Matrix::new(2, 1);
+        let mut b = Matrix::zeros(2, 1);
         b.data = vec![6., 2.];
 
         let c = a.dot(&b);
@@ -133,9 +177,9 @@ mod tests {
     }
     #[test]
     fn test_dot2() {
-        let mut a = Matrix::new(2, 2);
+        let mut a = Matrix::zeros(2, 2);
         a.data = vec![3., 4., 7., 2.];
-        let mut b = Matrix::new(2, 2);
+        let mut b = Matrix::zeros(2, 2);
         b.data = vec![6., 2., 1., 2.];
 
         let c = a.dot(&b);
@@ -148,9 +192,9 @@ mod tests {
 
     #[test]
     fn test_add() {
-        let mut a = Matrix::new(2, 2);
+        let mut a = Matrix::zeros(2, 2);
         a.data = vec![3., 4., 7., 2.];
-        let mut b = Matrix::new(2, 2);
+        let mut b = Matrix::zeros(2, 2);
         b.data = vec![6., 2., 1., 2.];
 
         let c = a.add(&b);
@@ -162,9 +206,9 @@ mod tests {
     }
     #[test]
     fn test_subtract() {
-        let mut a = Matrix::new(2, 2);
+        let mut a = Matrix::zeros(2, 2);
         a.data = vec![3., 4., 7., 2.];
-        let mut b = Matrix::new(2, 2);
+        let mut b = Matrix::zeros(2, 2);
         b.data = vec![6., 2., 1., 2.];
 
         let c = a.subtract(&b);
