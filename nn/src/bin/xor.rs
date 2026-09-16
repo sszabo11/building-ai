@@ -1,18 +1,16 @@
 use linalg::Matrix;
-
-use crate::net::{Activation, Network};
-mod net;
-mod probs;
+use nn::net::{Activation, Network};
 
 fn main() {
-    let layers = vec![3, 5, 1];
+    let layers = vec![3, 5, 2];
 
     let mut net = Network::new(layers, 2, Activation::Sigmoid);
+    println!("{:?}", net.weights[0].data);
 
     //let x = Matrix::from(&[&[1.0, 0.0]]);
     //let true_y = Matrix::from(&[&[0.0, 0.0]]);
 
-    train(&mut net, 1000);
+    train(&mut net, 10000);
 }
 
 fn train(net: &mut Network, epochs: usize) {
@@ -21,13 +19,13 @@ fn train(net: &mut Network, epochs: usize) {
         Matrix::from(&[&[1.0, 0.0]]),
         Matrix::from(&[&[0.0, 1.0]]),
         Matrix::from(&[&[1.0, 1.0]]),
-        Matrix::from(&[&[0.0, 0.0]]),
+        //Matrix::from(&[&[0.0, 0.0]]),
     ];
     let y_train = vec![
-        Matrix::from(&[&[0.0]]),
-        Matrix::from(&[&[0.0]]),
-        Matrix::from(&[&[1.0]]),
-        Matrix::from(&[&[1.0]]),
+        Matrix::from(&[&[0.0, 1.0]]),
+        Matrix::from(&[&[1.0, 0.0]]),
+        Matrix::from(&[&[0.0, 0.0]]),
+        //Matrix::from(&[&[1.0, 1.0]]),
     ];
 
     for epoch in 0..epochs {
@@ -48,7 +46,7 @@ fn train(net: &mut Network, epochs: usize) {
         }
     }
 
-    let x = Matrix::from(&[&[0.0, 1.0]]);
+    let x = Matrix::from(&[&[0.0, 0.0]]);
     let out = net.forward(x.t());
-    println!("Infernce: {:.4}", out.data[0]);
+    println!("Output: {:.4} {:.4}", out.data[0], out.data[1]);
 }

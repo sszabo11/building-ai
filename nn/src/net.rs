@@ -117,8 +117,6 @@ impl Network {
                 prev_layer.cols,
             );
 
-            println!("Layer: [{}]", l);
-
             // = Wx
             let wx = self.weights[l].dot(&prev_layer);
 
