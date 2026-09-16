@@ -1,3 +1,5 @@
+use std::str::LinesAny;
+
 use linalg::Matrix;
 use nn::{
     data::{IrisRecord, read_iris_data},
@@ -90,4 +92,21 @@ fn train(net: &mut Network, epochs: usize) {
     }
     let acc = correct as f32 / test_data.len() as f32 * 100.;
     println!("Accuracy: {:.2}%", acc);
+    plot_grad_mag(&net);
+}
+
+fn plot_grad_mag(net: &Network) {
+    let mut vals = vec![vec![0.0; net.grad_w[0].len()]; net.grad_w.len()];
+
+    for i in 0..net.grad_w.len() {
+        for j in 0..net.grad_w[i].len() {
+            let f = net.grad_w[i][j].frobenius_norm();
+            vals[i][j] = f;
+        }
+    }
+
+    let d1: Vec<f32> = vals.iter().map(|x| x[0]).collect();
+    let d2: Vec<f32> = vals.iter().map(|x| x[1]).collect();
+    let d3: Vec<f32> = vals.iter().map(|x| x[2]).collect();
+    simple_plot::plot!("title", d1, d2, d3);
 }

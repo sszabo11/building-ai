@@ -8,6 +8,7 @@ pub struct Network {
     pub biases: Vec<Matrix>,
     pub activation: Activation,
 
+    pub grad_w: Vec<Vec<Matrix>>,
     a: Vec<Matrix>, // Activation functions. a = σ(Wx + b)
     z: Vec<Matrix>, // Activation functions. z = Wx + b
 }
@@ -32,6 +33,7 @@ impl Network {
             .collect();
 
         Self {
+            grad_w: Vec::new(),
             layers,
             weights,
             biases,
@@ -53,7 +55,7 @@ impl Network {
         result
     }
 
-    pub fn backward(&self, x_input: &Matrix, y: &Matrix) -> (Vec<Matrix>, Vec<Matrix>) {
+    pub fn backward(&mut self, x_input: &Matrix, y: &Matrix) -> (Vec<Matrix>, Vec<Matrix>) {
         assert!(y.cols == 1);
 
         let num_layers = self.layers.len();
@@ -93,6 +95,7 @@ impl Network {
             };
         }
         weight_grads.reverse();
+        self.grad_w.push(weight_grads.clone());
         bias_grads.reverse();
         (weight_grads, bias_grads)
     }

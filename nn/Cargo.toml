@@ -8,3 +8,4 @@ csv = "1.4.0"
 linalg = {path = "../linalg"}
 rand = "0.10.2"
 serde = { version = "1.0.229", features = ["derive"] }
+simple-plot = "0.1.2"
