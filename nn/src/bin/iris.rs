@@ -3,17 +3,17 @@ use std::str::LinesAny;
 use linalg::Matrix;
 use nn::{
     data::{IrisRecord, read_iris_data},
-    net::{Activation, Network},
+    net::{Activation, Network, softmax},
     utils::{one_hot, un_hot},
 };
 
 fn main() {
-    let layers = vec![4, 10, 3];
+    let layers = vec![4, 30, 3];
 
     let mut net = Network::new(layers, 4, Activation::Sigmoid);
     println!("{:?}", net.weights[0].data);
 
-    train(&mut net, 1000);
+    train(&mut net, 5000);
 }
 
 const SPECIES_LIST: &[&str] = &["iris-setosa", "iris-versicolor", "iris-virginica"];
@@ -57,11 +57,17 @@ fn train(net: &mut Network, epochs: usize) {
             let out = net.forward(x.t());
 
             let loss = net.loss(&y);
-            if epoch % 100 == 0 {
+            if epoch % 10 == 0 && sample == 1 {
                 println!("Epoch {} | Loss: {}", epoch, loss);
             }
 
             let (weight_grads, bias_grads) = net.backward(&x.t(), &y.t());
+            //{
+            //    let l = net.layers.len() - 1;
+            //    net.weights[l] = net.weights[l].subtract(&weight_grads[l].scale(lr));
+            //    net.biases[l] = net.biases[l].subtract(&bias_grads[l].scale(lr));
+            //}
+            //for l in (net.layers.len() - 1)..net.layers.len() {
             for l in 0..net.layers.len() {
                 net.weights[l] = net.weights[l].subtract(&weight_grads[l].scale(lr));
                 net.biases[l] = net.biases[l].subtract(&bias_grads[l].scale(lr));
@@ -73,18 +79,21 @@ fn train(net: &mut Network, epochs: usize) {
     for sample in 0..test_data.len() {
         let (x, y) = &test_data[sample];
 
-        let out = net.forward(x.t());
-        let max_index = out
+        let logits = net.forward(x.t());
+        let max_index = logits
             .data
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.total_cmp(b))
             .map(|(index, _)| index)
             .unwrap();
-        println!(
-            "Raw: [{}, {}, {}]\nTrue: [{:?}]\nOutput: {}\n",
-            out.data[0], out.data[1], out.data[2], y.data, SPECIES_LIST[max_index]
-        );
+
+        let probs = softmax(&logits);
+        println!("{:?}", probs);
+        //println!(
+        //    "Raw: [{}, {}, {}]\nTrue: [{:?}]\nOutput: {}\n",
+        //    out.data[0], out.data[1], out.data[2], y.data, SPECIES_LIST[max_index]
+        //);
         let y_pos = y.data.iter().position(|&y| y == 1.).unwrap();
         if max_index == y_pos {
             correct += 1;
@@ -92,7 +101,7 @@ fn train(net: &mut Network, epochs: usize) {
     }
     let acc = correct as f32 / test_data.len() as f32 * 100.;
     println!("Accuracy: {:.2}%", acc);
-    plot_grad_mag(&net);
+    //plot_grad_mag(&net);
 }
 
 fn plot_grad_mag(net: &Network) {

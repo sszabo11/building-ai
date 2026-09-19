@@ -32,13 +32,25 @@ impl Matrix {
             data: data.into_iter().copied().flatten().copied().collect(),
         }
     }
+    pub fn from_shape_fn<F>(rows: usize, cols: usize, mut func: F) -> Self
+    where
+        F: FnMut() -> f32,
+    {
+        Self {
+            rows,
+            cols,
+            data: (0..rows * cols).map(|_| func()).collect(),
+        }
+    }
     pub fn random(rows: usize, cols: usize) -> Self {
         let mut rng = rand::rng();
 
         Self {
             rows,
             cols,
-            data: (0..rows * cols).map(|_| rng.random::<f32>()).collect(),
+            data: (0..rows * cols)
+                .map(|_| rng.random::<f32>() * 2. - 1.)
+                .collect(),
         }
     }
 
@@ -47,6 +59,29 @@ impl Matrix {
         let end = start + self.rows;
         let s = &self.data[start..end];
         s
+    }
+    pub fn sub_assign_scaled(&mut self, other: &Matrix, scale: f32) {
+        assert!(
+            self.rows == other.rows && self.cols == other.cols,
+            "a: {} | b: {}",
+            self.pretty_shape(),
+            other.pretty_shape()
+        );
+        for i in 0..self.data.len() {
+            self.data[i] -= other.data[i] * scale;
+        }
+    }
+    pub fn add_assign(&mut self, other: &Matrix) {
+        assert!(self.rows == other.rows && self.cols == other.cols);
+        for i in 0..self.data.len() {
+            self.data[i] += other.data[i];
+        }
+    }
+    pub fn pow_assign(&mut self, pow: f32) -> &Self {
+        for i in 0..self.rows * self.cols {
+            self.data[i] = self.data[i].powf(pow);
+        }
+        self
     }
     pub fn pow(&self, pow: f32) -> Matrix {
         let mut result = Matrix::zeros(self.rows, self.cols);
@@ -71,6 +106,14 @@ impl Matrix {
         }
         result
     }
+    pub fn sum(&self) -> f32 {
+        let mut result = 0.0;
+        for i in 0..self.rows * self.cols {
+            result += self.data[i];
+        }
+        result
+    }
+
     pub fn mul(&self, other: &Matrix) -> Matrix {
         assert!(self.rows == other.rows && self.cols == other.cols);
         let mut result = Matrix::zeros(self.rows, self.cols);
@@ -96,6 +139,9 @@ impl Matrix {
             }
         }
         result
+    }
+    pub fn frobenius_norm(&self) -> f32 {
+        self.data.iter().map(|x| x * x).sum::<f32>().sqrt()
     }
     pub fn subtract(&self, other: &Matrix) -> Matrix {
         assert!(self.rows == other.rows && self.cols == other.cols);

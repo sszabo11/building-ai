@@ -1,5 +1,3 @@
-use std::f32;
-
 use linalg::Matrix;
 
 pub struct Network {
@@ -9,8 +7,8 @@ pub struct Network {
     pub activation: Activation,
 
     pub grad_w: Vec<Vec<Matrix>>,
-    a: Vec<Matrix>, // Activation functions. a = σ(Wx + b)
-    z: Vec<Matrix>, // Activation functions. z = Wx + b
+    pub a: Vec<Matrix>, // Activation functions. a = σ(Wx + b)
+    pub z: Vec<Matrix>, // Activation functions. z = Wx + b
 }
 
 impl Network {
@@ -95,21 +93,24 @@ impl Network {
             };
         }
         weight_grads.reverse();
-        self.grad_w.push(weight_grads.clone());
+        //self.grad_w.push(weight_grads.clone());
         bias_grads.reverse();
         (weight_grads, bias_grads)
     }
 
     pub fn loss(&self, y: &Matrix) -> f32 {
-        let diff = y.t().subtract(&self.a[self.layers.len() - 1]).pow(2.0);
+        let mut diff = y.t().subtract(&self.a[self.layers.len() - 1]);
+
+        diff.pow_assign(2.0);
+
         let total_loss = diff.data.iter().sum::<f32>();
         total_loss / y.rows as f32
     }
 
-    pub fn forward(&mut self, x: Matrix) -> Matrix {
+    pub fn forward(&mut self, x: &Matrix) -> Matrix {
         self.a.clear();
         self.z.clear();
-        let mut prev_layer = x;
+        let mut prev_layer = x.clone();
         for l in 0..self.layers.len() {
             assert!(
                 self.weights[l].cols == prev_layer.rows,
@@ -159,5 +160,15 @@ fn calc_activate_fn(func: &Activation, x: f32) -> f32 {
 }
 
 fn sigmoid(x: f32) -> f32 {
-    1. / (1. + f32::consts::E.powf(-x))
+    1. / (1. + std::f32::consts::E.powf(-x))
+}
+
+pub fn softmax(val: &Matrix) -> Vec<f32> {
+    assert!(val.cols == 1);
+
+    let max_val = val.data.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let exps: Vec<f32> = val.data.iter().map(|x| (x - max_val).exp()).collect();
+    let sum: f32 = exps.iter().sum();
+
+    exps.iter().map(|e| e / sum).collect()
 }

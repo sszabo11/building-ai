@@ -7,5 +7,11 @@ edition = "2024"
 csv = "1.4.0"
 linalg = {path = "../linalg"}
 rand = "0.10.2"
+rand_distr = "0.6.0"
 serde = { version = "1.0.229", features = ["derive"] }
 simple-plot = "0.1.2"
+
+[profile.release]
+lto = true            # link-time optimization, better inlining across crate boundaries (linalg <-> nn)
+codegen-units = 1      # slower to compile, faster resulting binary
+opt-level = 3          # default for release, but explicit doesn't hurt
