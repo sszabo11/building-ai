@@ -9,7 +9,7 @@ use nn::{
 const IMG_SIZE: usize = 16;
 const INPUT_DIM: usize = IMG_SIZE * IMG_SIZE * 4;
 fn main() {
-    let layers = vec![5, 30, INPUT_DIM];
+    let layers = vec![5, 40, INPUT_DIM];
 
     let mut net = Network::new(layers.clone(), 5, Activation::Sigmoid);
     //println!("{:?}", net.weights[0].data);
@@ -17,7 +17,7 @@ fn main() {
     let training_data = read_img_labels().unwrap();
     let training_data = parse_data(training_data);
 
-    train(&mut net, 200000, &training_data);
+    train(&mut net, 10000, &training_data);
     generate_img(&mut net, &training_data[0].1);
 
     //let layers2 = vec![5, 100, INPUT_DIM];

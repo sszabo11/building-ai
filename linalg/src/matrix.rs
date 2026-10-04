@@ -1,4 +1,4 @@
-use rand::RngExt;
+use rand::{rngs::StdRng, RngExt, SeedableRng};
 
 #[derive(Debug, Clone)]
 pub struct Matrix {
@@ -43,7 +43,7 @@ impl Matrix {
         }
     }
     pub fn random(rows: usize, cols: usize) -> Self {
-        let mut rng = rand::rng();
+        let mut rng = StdRng::seed_from_u64(42);
 
         Self {
             rows,
