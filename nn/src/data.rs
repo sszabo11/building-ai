@@ -44,7 +44,7 @@ pub struct LabelRecord {
     pub label: String,
 }
 
-type Px = (u8, u8, u8, u8);
+type Px = (f32, f32, f32, f32);
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct ImageRecord {
@@ -65,7 +65,7 @@ fn parse_label(label: &str) -> Vec<f32> {
 
     let l: Vec<&str> = lab.split(".").collect();
 
-    let v = (0..4)
+    let v = (0..5)
         .into_iter()
         .map(|i| {
             l[i].trim()
@@ -90,11 +90,20 @@ pub fn read_img_labels() -> Result<Vec<ImageRecord>, Box<dyn Error>> {
         let img = ImageReader::open(path)?.decode()?;
 
         let lab = parse_label(&label.label);
+        let pxs: Vec<(f32, f32, f32, f32)> = img
+            .pixels()
+            .map(|(_x, _y, color)| {
+                (
+                    color[0] as f32 / 255.,
+                    color[1] as f32 / 255.,
+                    color[2] as f32 / 255.,
+                    color[3] as f32 / 255.,
+                )
+            })
+            .collect();
+
         let record = ImageRecord {
-            pxs: img
-                .pixels()
-                .map(|(_x, _y, color)| (color[0], color[1], color[2], color[3]))
-                .collect(),
+            pxs,
             image_index: label.image_index,
             image_path: label.image_path,
             label: lab,
@@ -105,9 +114,10 @@ pub fn read_img_labels() -> Result<Vec<ImageRecord>, Box<dyn Error>> {
     }
 
     data.shuffle(&mut rand::rng());
+    let data = &data[..100];
     //let split = (0.3 * data.len() as f32) as usize;
 
     println!("Training samples: {}", data.len());
 
-    Ok(data)
+    Ok(data.to_vec())
 }

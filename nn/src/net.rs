@@ -13,7 +13,7 @@ pub struct Network {
 
 impl Network {
     pub fn new(layers: Vec<usize>, input_dim: usize, activation: Activation) -> Self {
-        let weights = (0..layers.len())
+        let weights: Vec<Matrix> = (0..layers.len())
             .map(|layer| {
                 let size = layers[layer];
                 let prev = if layer == 0 {
@@ -27,7 +27,7 @@ impl Network {
 
         let biases = layers
             .iter()
-            .map(|&num_n| Matrix::random(num_n, 1))
+            .map(|&num_n| Matrix::zeros(num_n, 1))
             .collect();
 
         Self {
@@ -107,11 +107,14 @@ impl Network {
         total_loss / y.rows as f32
     }
 
-    pub fn forward(&mut self, x: &Matrix) -> Matrix {
+    pub fn forward(&mut self, x: &Matrix, pr: bool) -> Matrix {
         self.a.clear();
         self.z.clear();
         let mut prev_layer = x.clone();
         for l in 0..self.layers.len() {
+            if pr {
+                println!("layer: {}", l);
+            }
             assert!(
                 self.weights[l].cols == prev_layer.rows,
                 "Weights: [{} x {}] | Input shape: [{} x {}]",

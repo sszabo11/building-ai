@@ -1,3 +1,4 @@
+use image::{ImageBuffer, Rgb, Rgba};
 use linalg::Matrix;
 use nn::{
     data::{ImageRecord, IrisRecord, read_img_labels, read_iris_data},
@@ -6,13 +7,70 @@ use nn::{
 };
 
 const IMG_SIZE: usize = 16;
+const INPUT_DIM: usize = IMG_SIZE * IMG_SIZE * 4;
 fn main() {
-    let layers = vec![IMG_SIZE * IMG_SIZE, 30, 4];
+    let layers = vec![INPUT_DIM, 100, 5];
 
-    let mut net = Network::new(layers, 4, Activation::Sigmoid);
+    let mut net = Network::new(layers.clone(), INPUT_DIM, Activation::Sigmoid);
     //println!("{:?}", net.weights[0].data);
 
-    train(&mut net, 5000);
+    let training_data = read_img_labels().unwrap();
+    let training_data = parse_data(training_data);
+
+    train(&mut net, 1000, &training_data);
+
+    let layers2 = vec![5, 100, INPUT_DIM];
+
+    let mut inf = Network::new(layers2, 5, Activation::Sigmoid);
+
+    let num_layers = layers.len();
+
+    println!("{}", net.biases.len());
+    println!("{}", net.biases.len());
+    let n = net.weights.len();
+
+    let n = net.weights.len();
+    assert_eq!(n, inf.weights.len());
+
+    for i in 0..n {
+        let j = n - 1 - i;
+        inf.weights[j] = net.weights[i].t();
+    }
+
+    // biases: only the “middle” ones line up; the very last one of the
+    // reversed net has no counterpart and must be zero-initialised
+    for j in 0..n {
+        let needed = inf.weights[j].rows; // output size of this layer
+        if let Some(b) = net.biases.iter().find(|b| b.rows == needed) {
+            inf.biases[j] = b.clone();
+        } else {
+            inf.biases[j] = Matrix::zeros(needed, 1);
+        }
+    }
+    //for i in 0..n {
+    //    let j = n - 1 - i;
+    //    println!("layer d: {}", j);
+    //    let w = net.weights[i].t();
+
+    //    let b = if j < n - 1 {
+    //        net.biases[i].clone()
+    //    } else {
+    //        let out_dim = inf.weights[j].rows;
+    //        Matrix::zeros(out_dim, 1)
+    //    };
+    //    //let b = net.biases[i].clone();
+
+    //    println!("w: {}", net.weights[i].pretty_shape());
+    //    println!("wt: {}", w.pretty_shape());
+
+    //    println!("b: {}", net.biases[i].pretty_shape());
+    //    println!("bt: {}", b.pretty_shape());
+    //    inf.weights[j] = w;
+    //    inf.biases[j] = b;
+    //}
+
+    run_reversed(&mut inf, &training_data);
+    generate_img(&mut inf, &training_data[0].1);
 }
 
 fn parse_data(data: Vec<ImageRecord>) -> Vec<(Matrix, Matrix)> {
@@ -29,7 +87,7 @@ fn parse_data(data: Vec<ImageRecord>) -> Vec<(Matrix, Matrix)> {
             },
         );
 
-        let mut x_in = Matrix::zeros(4, IMG_SIZE * IMG_SIZE);
+        let mut x_in = Matrix::zeros(1, INPUT_DIM);
         for channel in 0..4 {
             for y in 0..IMG_SIZE {
                 for x in 0..IMG_SIZE {
@@ -48,14 +106,12 @@ fn parse_data(data: Vec<ImageRecord>) -> Vec<(Matrix, Matrix)> {
 
     parsed
 }
-fn train(net: &mut Network, epochs: usize) {
-    let lr = 0.1;
+fn train(net: &mut Network, epochs: usize, training_data: &[(Matrix, Matrix)]) {
+    let lr = 0.01;
 
-    let training_data = read_img_labels().unwrap();
-    let training_data = parse_data(training_data);
     let training_samples = training_data.len();
 
-    let (x_train, y_train): (Vec<Matrix>, Vec<Matrix>) = training_data.clone().into_iter().unzip();
+    let (x_train, y_train): (Vec<Matrix>, Vec<Matrix>) = training_data.iter().cloned().unzip();
     println!("{}", x_train[0].pretty_shape());
 
     for epoch in 0..epochs {
@@ -63,7 +119,7 @@ fn train(net: &mut Network, epochs: usize) {
             let x = &x_train[sample];
             let y = &y_train[sample];
 
-            let out = net.forward(x);
+            let out = net.forward(&x.t(), false);
 
             let loss = net.loss(&y);
             if epoch % 10 == 0 && sample == 1 {
@@ -79,7 +135,7 @@ fn train(net: &mut Network, epochs: usize) {
             //for l in (net.layers.len() - 1)..net.layers.len() {
             for l in 0..net.layers.len() {
                 net.weights[l] = net.weights[l].subtract(&weight_grads[l].scale(lr));
-                net.biases[l] = net.biases[l].subtract(&bias_grads[l].scale(lr));
+                //net.biases[l] = net.biases[l].subtract(&bias_grads[l].scale(lr));
             }
         }
     }
@@ -88,7 +144,7 @@ fn train(net: &mut Network, epochs: usize) {
     for sample in 0..training_samples {
         let (x, y) = &training_data[sample];
 
-        let logits = net.forward(x);
+        let logits = net.forward(&x.t(), false);
         let max_index = logits
             .data
             .iter()
@@ -97,13 +153,11 @@ fn train(net: &mut Network, epochs: usize) {
             .map(|(index, _)| index)
             .unwrap();
 
-        let probs = softmax(&logits);
-        println!("{:?}", probs);
-        //println!(
-        //    "Raw: [{}, {}, {}]\nTrue: [{:?}]\nOutput: {}\n",
-        //    out.data[0], out.data[1], out.data[2], y.data, SPECIES_LIST[max_index]
-        //);
+        //let probs = softmax(&logits);
+        //println!("{:?}", probs);
+
         let y_pos = y.data.iter().position(|&y| y == 1.).unwrap();
+
         if max_index == y_pos {
             correct += 1;
         }
@@ -111,4 +165,55 @@ fn train(net: &mut Network, epochs: usize) {
     let acc = correct as f32 / training_samples as f32 * 100.;
     println!("Accuracy: {:.2}%", acc);
     //plot_grad_mag(&net);
+}
+
+fn run_reversed(net: &mut Network, training_data: &[(Matrix, Matrix)]) {
+    let training_samples = training_data.len();
+
+    let mut correct = 0;
+    for sample in 0..training_samples {
+        let (y, x) = &training_data[sample];
+
+        let logits = net.forward(&x.t(), true);
+        let max_index = logits
+            .data
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
+            .map(|(index, _)| index)
+            .unwrap();
+
+        //let probs = softmax(&logits);
+        //println!("{:?}", probs);
+
+        let y_pos = y.data.iter().position(|&y| y == 1.).unwrap();
+
+        if max_index == y_pos {
+            correct += 1;
+        }
+    }
+
+    let acc = correct as f32 / training_samples as f32 * 100.;
+    println!("Accuracy: {:.2}%", acc);
+}
+
+fn generate_img(net: &mut Network, x: &Matrix) {
+    let logits = net.forward(&x.t(), false);
+
+    println!("{:?}", logits);
+    let mut img = ImageBuffer::new(IMG_SIZE as u32, IMG_SIZE as u32);
+
+    // Iterate over the mutable pixels and assign colors
+    for (x, y, pixel) in img.enumerate_pixels_mut() {
+        let mut px: [u8; 4] = [0, 0, 0, 0];
+
+        for channel in 0..4 {
+            let i = (channel * IMG_SIZE * IMG_SIZE) + (y as usize * IMG_SIZE) + x as usize;
+
+            px[channel] = (logits.data[i] * 255.).round() as u8
+        }
+        // Assign the RGB values to the pixel
+        *pixel = Rgba(px);
+    }
+    img.save("output.png").unwrap();
 }

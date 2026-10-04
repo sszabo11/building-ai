@@ -130,7 +130,7 @@ impl Matrix {
     pub fn add(&self, other: &Matrix) -> Matrix {
         assert!(
             self.rows == other.rows && self.cols == other.cols,
-            "A: {} | B: {}",
+            "Failed to add: A: {} | B: {}",
             self.pretty_shape(),
             other.pretty_shape()
         );
