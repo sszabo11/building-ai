@@ -1,4 +1,5 @@
 use rand::{rngs::StdRng, RngExt, SeedableRng};
+use rand_distr::{Distribution, Normal};
 
 #[derive(Debug, Clone)]
 pub struct Matrix {
@@ -40,6 +41,14 @@ impl Matrix {
             rows,
             cols,
             data: (0..rows * cols).map(|_| func()).collect(),
+        }
+    }
+    pub fn sample(rows: usize, cols: usize, norm: Normal<f32>) -> Self {
+        let mut rng = StdRng::seed_from_u64(42);
+        Self {
+            rows,
+            cols,
+            data: (0..rows * cols).map(|_| norm.sample(&mut rng)).collect(),
         }
     }
     pub fn random(rows: usize, cols: usize) -> Self {

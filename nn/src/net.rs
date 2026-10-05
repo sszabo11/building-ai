@@ -1,4 +1,7 @@
+use core::num;
+
 use linalg::Matrix;
+use rand_distr::Normal;
 
 pub struct Network {
     pub layers: Vec<usize>,
@@ -13,6 +16,7 @@ pub struct Network {
 
 impl Network {
     pub fn new(layers: Vec<usize>, input_dim: usize, activation: Activation) -> Self {
+        let normal = Normal::new(0., (2.0 / input_dim as f32).sqrt()).unwrap();
         let weights: Vec<Matrix> = (0..layers.len())
             .map(|layer| {
                 let size = layers[layer];
@@ -21,7 +25,7 @@ impl Network {
                 } else {
                     layers[layer - 1]
                 };
-                Matrix::random(size, prev)
+                Matrix::sample(size, prev, normal)
             })
             .collect();
 
@@ -66,16 +70,45 @@ impl Network {
         //    y.pretty_shape(),
         //    self.a[num_layers - 1].pretty_shape()
         //);
+
+        // meas sqaure loss
+        //let mut grad_a = self.a[num_layers - 1].subtract(y);
         let mut grad_a = self.a[num_layers - 1].subtract(y);
+
+        for v in grad_a.data.iter_mut() {
+            if *v > 0.0 {
+                *v = 1.0;
+            } else if *v < 0.0 {
+                *v = -1.0;
+            } else {
+                *v = 0.0;
+            }
+        }
 
         for l in (0..num_layers).rev() {
             // ∂L/∂a = (a - y)
             let a = &self.a[l];
-            let one_minus_a = Matrix::ones(a.rows, a.cols).subtract(a);
+            //let one_minus_a = Matrix::ones(a.rows, a.cols).subtract(a);
 
             // ∂L/∂z = a(1 - a)
             // = grad_a * a(1 - a)
-            let grad_z = grad_a.mul(&a.mul(&one_minus_a));
+            //let grad_z = grad_a.mul(&a.mul(&one_minus_a)); // sigmoid
+
+            //let grad_z = grad_a.clone(); // linear
+
+            //tanh
+            let a_sq = a.mul(a); // a²
+            let one_minus_a_sq = Matrix::ones(a.rows, a.cols).subtract(&a_sq);
+            let grad_z = grad_a.mul(&one_minus_a_sq);
+
+            //// relu
+            //let mut relu_mask = a.clone();
+            //for v in relu_mask.data.iter_mut() {
+            //    *v = if *v > 0.0 { 1.0 } else { 0.01 };
+            //}
+
+            //// ∂L/∂z = grad_a ⊙ relu_mask
+            //let grad_z = grad_a.mul(&relu_mask);
 
             // ∂L/∂w
             // = x (prev a)
@@ -98,13 +131,21 @@ impl Network {
         (weight_grads, bias_grads)
     }
 
-    pub fn loss(&self, y: &Matrix) -> f32 {
-        let mut diff = y.t().subtract(&self.a[self.layers.len() - 1]);
+    pub fn loss(&self, out: &Matrix, y: &Matrix) -> f32 {
+        let mut diff = y.t().subtract(out);
 
         diff.pow_assign(2.0);
 
         let total_loss = diff.data.iter().sum::<f32>();
-        total_loss / y.rows as f32
+        total_loss / y.data.len() as f32
+    }
+
+    pub fn l1_loss(&self, out: &Matrix, target: &Matrix) -> f32 {
+        let mut sum = 0.0;
+        for (o, t) in out.data.iter().zip(target.data.iter()) {
+            sum += (o - t).abs();
+        }
+        sum / out.data.len() as f32
     }
 
     pub fn forward(&mut self, x: &Matrix, pr: bool) -> Matrix {
@@ -151,11 +192,15 @@ pub enum Activation {
     Sigmoid,
     ReLu,
     Tanh,
+    Linear,
 }
 
 fn calc_activate_fn(func: &Activation, x: f32) -> f32 {
     match func {
         Activation::Sigmoid => sigmoid(x),
+        Activation::Linear => linear(x),
+        Activation::ReLu => relu(x),
+        Activation::Tanh => tanh(x),
         _ => {
             panic!("Not implemented")
         }
@@ -164,6 +209,18 @@ fn calc_activate_fn(func: &Activation, x: f32) -> f32 {
 
 fn sigmoid(x: f32) -> f32 {
     1. / (1. + std::f32::consts::E.powf(-x))
+}
+fn linear(x: f32) -> f32 {
+    x.clamp(-10., 10.)
+}
+fn relu(x: f32) -> f32 {
+    if x > 0.0 { x } else { 0.01 }
+}
+fn tanh(x: f32) -> f32 {
+    x.tanh()
+    //let exp_x = x.exp();
+    //let exp_nx = (-x).exp();
+    //(exp_x - exp_nx) / (exp_x + exp_nx)
 }
 
 pub fn softmax(val: &Matrix) -> Vec<f32> {

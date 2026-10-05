@@ -9,70 +9,17 @@ use nn::{
 const IMG_SIZE: usize = 16;
 const INPUT_DIM: usize = IMG_SIZE * IMG_SIZE * 4;
 fn main() {
-    let layers = vec![5, 20, 100, 500, INPUT_DIM];
+    let layers = vec![5, 50, INPUT_DIM];
 
-    let mut net = Network::new(layers.clone(), 5, Activation::Tanh);
+    let mut net = Network::new(layers.clone(), 5, Activation::Sigmoid);
     //println!("{:?}", net.weights[0].data);
 
     let training_data = read_img_labels().unwrap();
     let training_data = parse_data(training_data);
 
-    train(&mut net, 1000, &training_data);
+    train(&mut net, 50000, &training_data);
 
     generate_img(&mut net, &training_data[0].1);
-
-    //let layers2 = vec![5, 30, INPUT_DIM];
-
-    //let mut inf = Network::new(layers2, 5, Activation::Tanh);
-
-    //let num_layers = layers.len();
-
-    //println!("{}", net.biases.len());
-    //println!("{}", net.biases.len());
-    //let n = net.weights.len();
-
-    //let n = net.weights.len();
-    //assert_eq!(n, inf.weights.len());
-
-    //for i in 0..n {
-    //    let j = n - 1 - i;
-    //    inf.weights[j] = net.weights[i].t();
-    //}
-
-    //// biases: only the “middle” ones line up; the very last one of the
-    //// reversed net has no counterpart and must be zero-initialised
-    //for j in 0..n {
-    //    let needed = inf.weights[j].rows; // output size of this layer
-    //    if let Some(b) = net.biases.iter().find(|b| b.rows == needed) {
-    //        inf.biases[j] = b.clone();
-    //    } else {
-    //        inf.biases[j] = Matrix::zeros(needed, 1);
-    //    }
-    //}
-    ////for i in 0..n {
-    ////    let j = n - 1 - i;
-    ////    println!("layer d: {}", j);
-    ////    let w = net.weights[i].t();
-
-    ////    let b = if j < n - 1 {
-    ////        net.biases[i].clone()
-    ////    } else {
-    ////        let out_dim = inf.weights[j].rows;
-    ////        Matrix::zeros(out_dim, 1)
-    ////    };
-    ////    //let b = net.biases[i].clone();
-
-    ////    println!("w: {}", net.weights[i].pretty_shape());
-    ////    println!("wt: {}", w.pretty_shape());
-
-    ////    println!("b: {}", net.biases[i].pretty_shape());
-    ////    println!("bt: {}", b.pretty_shape());
-    ////    inf.weights[j] = w;
-    ////    inf.biases[j] = b;
-    ////}
-
-    //run_reversed(&mut inf, &training_data);
-    //generate_img(&mut inf, &training_data[0].1);
 }
 
 fn parse_data(data: Vec<ImageRecord>) -> Vec<(Matrix, Matrix)> {
@@ -81,10 +28,10 @@ fn parse_data(data: Vec<ImageRecord>) -> Vec<(Matrix, Matrix)> {
         let channels: [Vec<f32>; 4] = record.pxs.iter().fold(
             [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
             |mut acc, (r, g, b, a)| {
-                acc[0].push(*r as f32);
-                acc[1].push(*g as f32);
-                acc[2].push(*b as f32);
-                acc[3].push(*a as f32);
+                acc[0].push(*r);
+                acc[1].push(*g);
+                acc[2].push(*b);
+                acc[3].push(*a);
                 acc
             },
         );
@@ -123,9 +70,10 @@ fn train(net: &mut Network, epochs: usize, training_data: &[(Matrix, Matrix)]) {
 
             let out = net.forward(&x.t(), false);
 
-            let loss = net.loss(&y);
+            let loss = net.loss(&out, &y);
+            let loss2 = net.l1_loss(&out, &y);
             if epoch % 10 == 0 && sample == 1 {
-                println!("Epoch {} | Loss: {}", epoch, loss);
+                println!("Epoch {} | Loss: {} | Loss 2: {}", epoch, loss, loss2);
             }
 
             let (weight_grads, bias_grads) = net.backward(&x.t(), &y.t());
@@ -158,11 +106,11 @@ fn train(net: &mut Network, epochs: usize, training_data: &[(Matrix, Matrix)]) {
         //let probs = softmax(&logits);
         //println!("{:?}", probs);
 
-        let y_pos = y.data.iter().position(|&y| y == 1.).unwrap();
+        //let y_pos = y.data.iter().position(|&y| y == 1.).unwrap();
 
-        if max_index == y_pos {
-            correct += 1;
-        }
+        //if max_index == y_pos {
+        //    correct += 1;
+        //}
     }
     let acc = correct as f32 / training_samples as f32 * 100.;
     println!("Accuracy: {:.2}%", acc);

@@ -114,7 +114,7 @@ pub fn read_img_labels() -> Result<Vec<ImageRecord>, Box<dyn Error>> {
     }
 
     data.shuffle(&mut rand::rng());
-    let data = &data[..20];
+    let data = &data[..50];
     //let split = (0.3 * data.len() as f32) as usize;
 
     println!("Training samples: {}", data.len());

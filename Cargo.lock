@@ -598,6 +598,7 @@ name = "linalg"
 version = "0.1.0"
 dependencies = [
  "rand 0.10.2",
+ "rand_distr 0.6.0",
 ]
 
 [[package]]
