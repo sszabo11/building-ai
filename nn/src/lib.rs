@@ -1,3 +1,4 @@
+pub mod cnn;
 pub mod data;
 pub mod dataset;
 pub mod net;
