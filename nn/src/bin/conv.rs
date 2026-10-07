@@ -15,15 +15,16 @@ fn main() {
     let net = Network::new(layers.clone(), 5, Activation::Sigmoid);
 
     let conv = ConvLayer::builder();
-    let conv1 = ConvLayer::input(10, 2, 4, 4, 0);
-    let conv2 = ConvLayer::new(10, 1, 3, 0);
+    let conv1 = ConvLayer::input(10, 2, 4, 4, 0, Some(Activation::ReLu));
+    let conv2 = ConvLayer::new(5, 1, 3, 10, 0, Some(Activation::ReLu));
+    //let conv3 = ConvLayer::new(5, 1, 2, 10, 0);
 
     let mut cnn = conv.layer(conv1).layer(conv2).fully_connected(net).build();
 
     let training_data = read_img_labels().unwrap();
     let training_data = parse_data(training_data);
 
-    cnn.train(training_data, 100);
+    cnn.train(&training_data, 1);
 
     //train(&mut net, 50000, &training_data);
 

@@ -195,7 +195,7 @@ pub enum Activation {
     Linear,
 }
 
-fn calc_activate_fn(func: &Activation, x: f32) -> f32 {
+pub fn calc_activate_fn(func: &Activation, x: f32) -> f32 {
     match func {
         Activation::Sigmoid => sigmoid(x),
         Activation::Linear => linear(x),

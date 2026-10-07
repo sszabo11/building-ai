@@ -1,9 +1,7 @@
-use std::env::home_dir;
-
 use image::{ImageBuffer, Rgba};
 use linalg::Matrix;
 
-use crate::net::Network;
+use crate::net::{Activation, Network, calc_activate_fn};
 
 pub struct ConvNet {
     pub layers: Vec<ConvLayer>,
@@ -11,24 +9,41 @@ pub struct ConvNet {
 }
 
 impl ConvNet {
-    pub fn train(&mut self, training_data: Vec<(Vec<Matrix>, Matrix)>, epochs: usize) {
+    pub fn train(&mut self, training_data: &[(Vec<Matrix>, Matrix)], epochs: usize) {
         let num_layers = self.layers.len();
         println!("training...");
 
-        //for epoch in 0..epochs {
-        let (x_train, y_train) = &training_data[0];
-        println!("x tr: {:?}", x_train);
+        let lr = 0.001;
+        for epoch in 0..epochs {
+            for sample in 0..training_data.len() {
+                let (x_train, y_train) = &training_data[sample];
 
-        let mut input = x_train;
+                let mut input = x_train.clone();
 
-        for l in 0..num_layers {
-            println!("Layer: {}", l);
-            let layer = &self.layers[l];
+                for l in 0..num_layers {
+                    println!("Layer: {}", l);
+                    let layer = &self.layers[l];
+                    //println!("{} {}:", input.len(), input[0].pretty_shape());
 
-            let out = layer.run(input);
-            generate_img(&out, l);
+                    let out = layer.run(&input);
+
+                    generate_img(&out, l);
+                    input = out;
+
+                    let loss = self.loss(&out, &y_train);
+
+                    if epoch % 10 == 0 {
+                        println!("Epoch {} | Loss: {}", epoch, loss);
+                    }
+
+                    for f in 0..layer.kernel.len() {
+                        let (weight_grads, bias_grads) = layer.backward(&x_train, &y_train.t());
+                        layer.kernel[f] = layer.kernel[f].subtract(&weight_grads[f].scale(lr));
+                        layer.bias[f] = layer.bias[f] - (&bias_grads[f].scale(lr));
+                    }
+                }
+            }
         }
-        //}
     }
 }
 
@@ -41,6 +56,10 @@ pub struct ConvLayer {
     pub padding: usize,
     pub bias: Vec<f32>,
     pub input_layer: bool,
+    pub activation: Option<Activation>,
+
+    pub a: Option<Matrix>, // Activation functions. a = σ(Wx + b)
+    pub z: Option<Matrix>, // Activation functions. z = Wx + b
 }
 
 pub struct ConvBuilder {
@@ -81,6 +100,7 @@ impl ConvLayer {
         kernel_size: usize,
         channels: usize,
         padding: usize,
+        activation: Option<Activation>,
     ) -> Self {
         Self {
             kernel_size,
@@ -89,20 +109,116 @@ impl ConvLayer {
             bias: vec![0.; num_filters],
             kernel: vec![Matrix::random(kernel_size * channels, kernel_size); num_filters],
             input_layer: true,
+            activation,
+            a: None,
+            z: None,
         }
     }
 
-    pub fn new(num_filters: usize, stride: usize, kernel_size: usize, padding: usize) -> Self {
+    pub fn new(
+        num_filters: usize,
+        stride: usize,
+        kernel_size: usize,
+        channels: usize,
+        padding: usize,
+        activation: Option<Activation>,
+    ) -> Self {
         Self {
             kernel_size,
             stride,
             padding,
             bias: vec![0.; num_filters],
-            kernel: vec![Matrix::random(kernel_size, kernel_size); num_filters],
-            input_layer: true,
+            kernel: vec![Matrix::random(kernel_size * channels, kernel_size); num_filters],
+            input_layer: false,
+            activation,
+            a: None,
+            z: None,
         }
     }
 
+    pub fn cross_entropy_loss(&self, target_y: Matrix, pred_y: Matrix) -> f32 {
+        assert!(target_y.rows == pred_y.rows);
+        assert!(target_y.cols == pred_y.cols);
+
+        let loss: f32 = -(0..target_y.rows * target_y.cols)
+            .map(|i| target_y.data[i] * pred_y.data[i].ln())
+            .sum::<f32>();
+
+        loss
+    }
+
+    pub fn backward(&mut self, x_input: &Matrix, y: &Matrix) -> (Vec<Matrix>, Vec<Matrix>) {
+        assert!(y.cols == 1);
+
+        let mut weight_grads = Vec::with_capacity(y.rows);
+        let mut bias_grads = Vec::with_capacity(y.rows);
+
+        let mut grad_a = x_input.subtract(&y);
+
+        let a = self.a.as_ref().unwrap();
+        let num_features = self.kernel.len();
+
+        for f in 0..num_features {
+            // relu
+
+            let mut relu_mask = a.clone();
+            for v in relu_mask.data.iter_mut() {
+                *v = if *v > 0.0 { 1.0 } else { 0.01 };
+            }
+
+            // ∂L/∂z = grad_a ⊙ relu_mask
+            let grad_z = grad_a.mul(&relu_mask);
+
+            // ∂L/∂w
+            // = x (prev a)
+            let input = if self.input_layer { &x_input } else { a };
+            let grad_w = grad_z.dot(&input.t()); // outer product.
+
+            // ∂L/∂b
+            // = 1
+            let grad_b = grad_z.clone();
+
+            weight_grads.push(grad_w);
+            bias_grads.push(grad_b);
+
+            if !self.input_layer {
+                grad_a = self.kernel[f].t().dot(&grad_z);
+            };
+        }
+
+        weight_grads.reverse();
+        bias_grads.reverse();
+        (weight_grads, bias_grads)
+    }
+
+    pub fn activation(&mut self, z: &Vec<Matrix>) -> Vec<Matrix> {
+        let h_out = z[0].rows;
+        let w_out = z[0].cols;
+
+        let num_features = z.len();
+        let mut a = vec![Matrix::zeros(h_out, w_out); num_features];
+
+        for f in 0..num_features {
+            for i in 0..h_out {
+                for j in 0..w_out {
+                    let z_i = z[f].data[i * w_out + j];
+                    if let Some(func) = &self.activation {
+                        let x = calc_activate_fn(&func, z_i);
+                        a[f].data[i * w_out + j] = x;
+                    } else {
+                        a[f].data[i * w_out + j] = z_i;
+                    }
+                }
+            }
+        }
+        a
+    }
+    pub fn forward(&mut self, input: &Vec<Matrix>) -> Vec<Matrix> {
+        let z = self.run(input);
+        let a = self.activation(&z);
+
+        a
+    }
     pub fn run(&self, input: &Vec<Matrix>) -> Vec<Matrix> {
         let rows = input[0].rows;
         let cols = input[0].cols;
@@ -117,10 +233,8 @@ impl ConvLayer {
         let stride = self.stride;
         let k = self.kernel_size;
 
-        println!("h in: {}", h_in);
         let h_out = (h_in + 2 * padding - k) / stride + 1;
         let w_out = (w_in + 2 * padding - k) / stride + 1;
-        println!("h out: {} | w out: {}", h_out, w_out);
         assert!(h_out < 100_000);
         assert!(w_out < 100_000);
 
@@ -147,7 +261,12 @@ impl ConvLayer {
                                 }
                             }
                         }
+                        //if let Some(func) = &self.activation {
+                        //    let x = calc_activate_fn(&func, sum);
+                        //    output[f].data[i * w_out + j] = x;
+                        //} else {
                         output[f].data[i * w_out + j] = sum;
+                        //}
                     }
                 }
             }
